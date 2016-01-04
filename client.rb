@@ -29,6 +29,6 @@ resp = client.create_stack({
     },
   ],
   disable_rollback: true,
-  timeout_in_minutes: 1,
+  timeout_in_minutes: 10,
   capabilities: ["CAPABILITY_IAM"], # accepts CAPABILITY_IAM
 })
