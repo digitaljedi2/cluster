@@ -1,0 +1,244 @@
+{
+  "Parameters": {
+    "System": {
+      "Description": "The fully qualified domain name for the entire system (eg. daily.digitaljedi.ca)",
+      "Type": "String"
+    },
+    "Cluster": {
+      "Description": "The domain prefix associated with this cluster (eg. a, b, c, etc...)",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "InstanceTenancy": "default",
+        "EnableDnsSupport": "true",
+        "EnableDnsHostnames": "true"
+      }
+    },
+    "publicsubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24",
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "privatesubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/24",
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "dbsubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "us-east-1"
+            }
+          ]
+        },
+        "CidrBlock": "10.0.100.0/24",
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "dbsubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "us-east-1"
+            }
+          ]
+        },
+        "CidrBlock": "10.0.101.0/24",
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "dbsubnet": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "DBSubnet for ",
+        "SubnetIds": [
+          {
+            "Ref": "dbsubnet1"
+          },
+          {
+            "Ref": "dbsubnet2"
+          }
+        ]
+      }
+    },
+    "internetgateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+      }
+    },
+    "gatewaytointernet": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "internetgateway"
+        }
+      }
+    },
+    "privateroutetable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "publicroutetable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "publicroute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "gatewaytointernet",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "publicroutetable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "internetgateway"
+        }
+      }
+    },
+    "privateroute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "gatewaytointernet",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "privateroutetable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "internetgateway"
+        }
+      }
+    },
+    "acl1": {
+      "Type": "AWS::EC2::NetworkAcl",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc"
+        }
+      }
+    },
+    "ACL001": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "CidrBlock": "0.0.0.0/0",
+        "Egress": true,
+        "Protocol": "-1",
+        "RuleAction": "allow",
+        "RuleNumber": "100",
+        "NetworkAclId": {
+          "Ref": "acl1"
+        }
+      }
+    },
+    "ACL002": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "CidrBlock": "0.0.0.0/0",
+        "Protocol": "-1",
+        "RuleAction": "allow",
+        "RuleNumber": "100",
+        "NetworkAclId": {
+          "Ref": "acl1"
+        }
+      }
+    },
+    "publicsubnetnetworkrouteassociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "publicsubnet"
+        },
+        "RouteTableId": {
+          "Ref": "publicroutetable"
+        }
+      }
+    },
+    "privatesubnetrouteassociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "privatesubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "privateroutetable"
+        }
+      }
+    },
+    "db1subnetrouteassociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "dbsubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "privateroutetable"
+        }
+      }
+    },
+    "db2subnetrouteassociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "dbsubnet2"
+        },
+        "RouteTableId": {
+          "Ref": "privateroutetable"
+        }
+      }
+    },
+    "dhcpoptions": {
+      "Type": "AWS::EC2::DHCPOptions",
+      "Properties": {
+        "DomainName": "jpoole.digitaljedi.ca",
+        "DomainNameServers": [
+          "AmazonProvidedDNS"
+        ]
+      }
+    },
+    "dhcpassoc": {
+      "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc"
+        },
+        "DhcpOptionsId": {
+          "Ref": "dhcpoptions"
+        }
+      }
+    }
+  }
+}
